@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spend Buddy</title>
+<style>
+  :root{
+    --bg:#f6f4ef; --card:#ffffff; --ink:#1d1d1f; --muted:#6b6b70;
+    --line:#e6e2d9; --good:#1f9d63; --warn:#e0a100; --bad:#d64545;
+    --accent:#5b5bd6; --chip:#f0eee8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#141416; --card:#1e1e22; --ink:#f2f2f3; --muted:#9a9aa3;
+      --line:#2e2e34; --chip:#2a2a30; --accent:#8b8bff;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  main{max-width:480px;margin:0 auto;padding:16px 16px 48px}
+  h1{font-size:18px;margin:4px 0 16px;display:flex;justify-content:space-between;align-items:center}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:14px}
+  .hero{text-align:center;padding:26px 18px}
+  .hero .label{color:var(--muted);font-size:14px}
+  .hero .big{font-size:56px;font-weight:800;letter-spacing:-1px;margin:4px 0}
+  .hero .sub{color:var(--muted);font-size:14px}
+  .bar{height:12px;background:var(--chip);border-radius:99px;overflow:hidden;margin-top:14px}
+  .bar > div{height:100%;border-radius:99px;transition:width .4s}
+  .amount{width:100%;font-size:36px;font-weight:700;text-align:center;border:2px solid var(--line);
+    border-radius:14px;padding:12px;background:transparent;color:var(--ink)}
+  .amount:focus{outline:none;border-color:var(--accent)}
+  .cats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+  .cat{border:0;background:var(--chip);color:var(--ink);border-radius:14px;padding:12px 4px;
+    font-size:13px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px}
+  .cat span{font-size:26px}
+  .cat:active{transform:scale(.95)}
+  .hint{color:var(--muted);font-size:13px;text-align:center;margin-top:10px}
+  ul{list-style:none;margin:0;padding:0}
+  li{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+  li:last-child{border-bottom:0}
+  li .e{font-size:22px}
+  li .n{flex:1}
+  li .n small{display:block;color:var(--muted);font-size:12px}
+  li .a{font-weight:700}
+  .x{border:0;background:none;color:var(--muted);font-size:18px;cursor:pointer;padding:4px 8px}
+  .btn{border:0;background:var(--accent);color:#fff;border-radius:12px;padding:12px 16px;
+    font-size:15px;font-weight:600;cursor:pointer;width:100%}
+  .ghost{background:var(--chip);color:var(--ink)}
+  .row{display:flex;gap:8px}
+  label{display:block;font-size:14px;color:var(--muted);margin:12px 0 4px}
+  input[type=number],input[type=text]{width:100%;font-size:16px;padding:10px 12px;border-radius:10px;
+    border:1px solid var(--line);background:transparent;color:var(--ink)}
+  .icon{border:0;background:var(--chip);color:var(--ink);border-radius:10px;padding:8px 12px;cursor:pointer;font-size:14px}
+  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(100px);
+    background:var(--ink);color:var(--bg);padding:12px 16px;border-radius:12px;display:flex;gap:12px;
+    align-items:center;transition:transform .25s;max-width:calc(100% - 32px)}
+  .toast.show{transform:translateX(-50%) translateY(0)}
+  .toast button{border:0;background:none;color:var(--accent);font-weight:700;cursor:pointer;font-size:15px}
+  .empty{color:var(--muted);text-align:center;padding:10px 0;font-size:14px}
+  h2{font-size:15px;margin:0 0 6px}
+  .hidden{display:none}
+  .streak{font-size:14px;color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+  <h1>💸 Spend Buddy <button class="icon" id="settingsBtn">⚙️ Setup</button></h1>
+
+  <!-- The one number that matters -->
+  <section class="card hero">
+    <div class="label">Safe to spend today</div>
+    <div class="big" id="today">$0</div>
+    <div class="sub" id="todaySub"></div>
+    <div class="bar"><div id="bar"></div></div>
+    <div class="sub" id="monthSub" style="margin-top:8px"></div>
+  </section>
+
+  <!-- Two taps to log -->
+  <section class="card">
+    <input class="amount" id="amt" type="number" inputmode="decimal" placeholder="$0" min="0" step="0.01">
+    <div class="cats" id="cats"></div>
+    <div class="hint">Type the amount, tap a category. Done.</div>
+  </section>
+
+  <section class="card">
+    <h2>Today</h2>
+    <ul id="list"></ul>
+    <div class="streak" id="streak"></div>
+  </section>
+
+  <!-- Setup -->
+  <section class="card hidden" id="settings">
+    <h2>Setup (do this once)</h2>
+    <label>Money coming in this month</label>
+    <input type="number" id="income" inputmode="decimal" placeholder="e.g. 4000">
+    <label>Bills &amp; savings to set aside (rent, power, phone, savings…)</label>
+    <input type="number" id="fixed" inputmode="decimal" placeholder="e.g. 2500">
+    <label>Currency symbol</label>
+    <input type="text" id="cur" maxlength="3" placeholder="$">
+    <div class="row" style="margin-top:14px">
+      <button class="btn" id="save">Save</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn ghost" id="exportBtn">⬇️ Backup</button>
+      <button class="btn ghost" id="importBtn">⬆️ Restore</button>
+      <button class="btn ghost" id="resetBtn">🗑 Reset</button>
+    </div>
+    <input type="file" id="file" accept="application/json" class="hidden">
+    <p class="hint">Data stays in this browser only. Use Backup now and then.</p>
+  </section>
+</main>
+
+<div class="toast" id="toast"><span id="toastMsg"></span><button id="undo">Undo</button></div>
+
+<script>
+const CATS = [
+  ["🍔","Food"],["🛒","Groceries"],["🚗","Transport"],["☕","Coffee"],
+  ["🎮","Fun"],["🛍️","Shopping"],["💊","Health"],["❓","Other"]
+];
+const KEY = "spendbuddy-v1";
+let state = load();
+let lastRemoved = null, lastAdded = null, toastTimer;
+
+function load(){
+  try { return JSON.parse(localStorage.getItem(KEY)) || fresh(); }
+  catch { return fresh(); }
+}
+function fresh(){ return {income:0, fixed:0, cur:"$", spends:[]}; }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch{} render(); }
+
+const $ = id => document.getElementById(id);
+const money = n => state.cur + (Math.round(n*100)/100).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2});
+const dayKey = d => d.toISOString().slice(0,10);
+const monthKey = d => d.toISOString().slice(0,7);
+
+function render(){
+  const now = new Date();
+  const mk = monthKey(now), tk = dayKey(now);
+  const month = state.spends.filter(s => s.d.slice(0,7) === mk);
+  const today = month.filter(s => s.d.slice(0,10) === tk);
+  const spentMonth = month.reduce((a,s)=>a+s.a,0);
+  const spentBeforeToday = spentMonth - today.reduce((a,s)=>a+s.a,0);
+  const pot = state.income - state.fixed;
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const daysLeft = daysInMonth - now.getDate() + 1;
+  const dailyAllowance = Math.max(0,(pot - spentBeforeToday) / daysLeft);
+  const leftToday = dailyAllowance - today.reduce((a,s)=>a+s.a,0);
+
+  if (!state.income){
+    $("today").textContent = "Set me up";
+    $("today").style.color = "var(--muted)";
+    $("todaySub").textContent = "Tap ⚙️ Setup — takes 30 seconds";
+    $("monthSub").textContent = "";
+    $("bar").style.width = "0";
+  } else {
+    $("today").textContent = money(Math.max(0,leftToday));
+    const pct = dailyAllowance ? leftToday / dailyAllowance : 0;
+    const color = leftToday < 0 ? "var(--bad)" : pct < .3 ? "var(--warn)" : "var(--good)";
+    $("today").style.color = color;
+    $("todaySub").textContent = leftToday < 0
+      ? `Over by ${money(-leftToday)} — no stress, tomorrow adjusts 💛`
+      : `of ${money(dailyAllowance)} for today`;
+    const monthPct = pot > 0 ? Math.min(1, spentMonth / pot) : 1;
+    $("bar").style.width = (monthPct*100)+"%";
+    $("bar").style.background = color;
+    $("monthSub").textContent = `${money(Math.max(0,pot-spentMonth))} left for ${daysLeft} day${daysLeft>1?"s":""} this month`;
+  }
+
+  $("list").innerHTML = today.length ? today.slice().reverse().map(s=>`
+    <li><span class="e">${s.e}</span>
+      <span class="n">${s.c}<small>${new Date(s.d).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</small></span>
+      <span class="a">${money(s.a)}</span>
+      <button class="x" data-id="${s.id}" aria-label="Delete">✕</button></li>`).join("")
+    : `<div class="empty">Nothing logged yet today ✨</div>`;
+
+  // streak: consecutive days (ending yesterday or today) where you stayed under allowance-ish / logged
+  const days = new Set(state.spends.map(s=>s.d.slice(0,10)));
+  let streak = 0, d = new Date();
+  if (!days.has(dayKey(d))) d.setDate(d.getDate()-1);
+  while (days.has(dayKey(d))) { streak++; d.setDate(d.getDate()-1); }
+  $("streak").textContent = streak > 1 ? `🔥 ${streak}-day logging streak` : "";
+
+  $("income").value = state.income || "";
+  $("fixed").value = state.fixed || "";
+  $("cur").value = state.cur;
+}
+
+// Category buttons
+$("cats").innerHTML = CATS.map(([e,c])=>`<button class="cat" data-e="${e}" data-c="${c}"><span>${e}</span>${c}</button>`).join("");
+$("cats").addEventListener("click", ev=>{
+  const b = ev.target.closest(".cat"); if(!b) return;
+  const a = parseFloat($("amt").value);
+  if (!a || a <= 0){ $("amt").focus(); flash("Type an amount first"); return; }
+  const s = {id:Date.now()+Math.random(), a, e:b.dataset.e, c:b.dataset.c, d:new Date().toISOString()};
+  state.spends.push(s); lastAdded = s; lastRemoved = null;
+  $("amt").value = "";
+  save();
+  toast(`Logged ${money(a)} ${b.dataset.e}`);
+});
+$("amt").addEventListener("keydown", e=>{ if(e.key==="Enter") flash("Now tap a category 👇"); });
+
+// Delete
+$("list").addEventListener("click", ev=>{
+  const b = ev.target.closest(".x"); if(!b) return;
+  const i = state.spends.findIndex(s=>String(s.id)===b.dataset.id);
+  if (i>-1){ lastRemoved = state.spends.splice(i,1)[0]; lastAdded = null; save(); toast("Deleted"); }
+});
+
+// Undo
+$("undo").addEventListener("click", ()=>{
+  if (lastAdded) state.spends = state.spends.filter(s=>s!==lastAdded);
+  if (lastRemoved) state.spends.push(lastRemoved);
+  lastAdded = lastRemoved = null; save(); hideToast();
+});
+
+function toast(msg, undo=true){
+  $("toastMsg").textContent = msg; $("undo").style.display = undo?"":"none";
+  $("toast").classList.add("show"); clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, 4000);
+}
+function flash(msg){ toast(msg,false); }
+function hideToast(){ $("toast").classList.remove("show"); }
+
+// Settings
+$("settingsBtn").onclick = ()=> $("settings").classList.toggle("hidden");
+$("save").onclick = ()=>{
+  state.income = parseFloat($("income").value)||0;
+  state.fixed = parseFloat($("fixed").value)||0;
+  state.cur = $("cur").value.trim() || "$";
+  save(); $("settings").classList.add("hidden"); flash("Saved ✅");
+};
+$("exportBtn").onclick = ()=>{
+  const blob = new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = `spend-buddy-${dayKey(new Date())}.json`; a.click();
+};
+$("importBtn").onclick = ()=> $("file").click();
+$("file").onchange = async e=>{
+  try { state = {...fresh(), ...JSON.parse(await e.target.files[0].text())}; save(); flash("Restored ✅"); }
+  catch { flash("That file didn't work"); }
+};
+$("resetBtn").onclick = ()=>{ if(confirm("Delete everything?")){ state = fresh(); save(); } };
+
+render();
+if (!state.income) $("settings").classList.remove("hidden");
+</script>
+</body>
+</html>
